@@ -35,12 +35,11 @@ jobs:
 
       # CLIs
       - name: Install Snyk
-        run: npm install -g snyk
+        run: npm install -g snyk --ignore-scripts     
 
       - name: Install Sonar Scanner
-        run: npm install -g sonarqube-scanner
+        run: npm install -g sonarqube-scanner --ignore-scripts      
 
-      # FRONTEND
       - name: Install Frontend deps
         working-directory: ./frontend
         run: npm ci
