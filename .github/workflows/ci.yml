@@ -8,16 +8,15 @@ on:
 
 jobs:
   build-test-scan:
-    name: Build, Test & Scan
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Criar arquivo .env temporário
+      - name: Criar .env
         run: |
           echo "SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}" >> .env
           echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" >> .env
@@ -27,40 +26,45 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      # 🔧 Instalar Snyk CLI
-      - name: Instalar Snyk CLI
+      # CLIs
+      - name: Install Snyk
         run: npm install -g snyk
 
-      # 🔧 Instalar Sonar Scanner
-      - name: Instalar Sonar Scanner
+      - name: Install Sonar Scanner
         run: npm install -g sonarqube-scanner
 
-      # 1. TESTES GO
-      - name: Instalar dependências Go
-        run: go mod download
-
-      - name: Rodar testes com cobertura
-        run: go test -coverprofile=coverage.out ./...
-
-      # 2. FRONTEND
-      - name: Instalar dependências Frontend
+      # FRONTEND
+      - name: Install Frontend deps
         working-directory: ./frontend
         run: npm ci
 
-      # 3. SNYK
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      # GO
+      - name: Go deps
+        run: go mod download
+
+      - name: Go tests
+        run: go test -coverprofile=coverage.out ./...
+
+      # SNYK
       - name: Snyk Test
         run: |
           export $(grep -v '^#' .env | xargs)
           snyk auth $SNYK_TOKEN
           snyk test --all-projects
 
-      # 4. SONAR
-      - name: SonarQube Scan
+      # SONAR
+      - name: Sonar Scan
         run: |
           export $(grep -v '^#' .env | xargs)
           sonar-scanner \
