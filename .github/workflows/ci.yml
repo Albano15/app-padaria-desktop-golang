@@ -1,0 +1,76 @@
+name: DevSecOps Pipeline (Go + Next.js)
+
+on:
+  push:
+    branches: [ "master", "develop" ]
+  pull_request:
+    branches: [ "master", "develop" ]
+
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Criar .env
+        run: |
+          echo "SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}" >> .env
+          echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" >> .env
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.2'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # CLIs
+      - name: Install Snyk
+        run: npm install -g snyk --ignore-scripts     
+
+      - name: Install Sonar Scanner
+        run: npm install -g sonarqube-scanner --ignore-scripts      
+
+      - name: Install Frontend deps
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      # GO
+      - name: Go deps
+        run: go mod download
+
+      - name: Go tests
+        run: go test -coverprofile=coverage.out ./...
+
+      # SNYK
+      - name: Snyk Test
+        run: |
+          export $(grep -v '^#' .env | xargs)
+          snyk auth $SNYK_TOKEN
+          snyk test --all-projects --severity-threshold=high
+
+      # SONAR
+      - name: Sonar Scan
+        run: |
+          export $(grep -v '^#' .env | xargs)
+          sonar-scanner \
+            -Dsonar.projectKey=Albano15_app-padaria-desktop-golang \
+            -Dsonar.organization=albano15 \
+            -Dsonar.go.coverage.reportPaths=coverage.out \
+            -Dsonar.sources=. \
+            -Dsonar.exclusions=frontend/dist/**,frontend/node_modules/**,frontend/.next/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
