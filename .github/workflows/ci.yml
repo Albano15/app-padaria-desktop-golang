@@ -1,0 +1,73 @@
+name: DevSecOps Pipeline (Go + Next.js)
+
+on:
+  push:
+    branches: [ "master", "develop" ]
+  pull_request:
+    branches: [ "master", "develop" ]
+
+jobs:
+  build-test-scan:
+    name: Build, Test & Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Criar arquivo .env temporário
+        run: |
+          echo "SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}" >> .env
+          echo "SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}" >> .env
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 🔧 Instalar Snyk CLI
+      - name: Instalar Snyk CLI
+        run: npm install -g snyk
+
+      # 🔧 Instalar Sonar Scanner
+      - name: Instalar Sonar Scanner
+        run: npm install -g sonarqube-scanner
+
+      # 1. TESTES GO
+      - name: Instalar dependências Go
+        run: go mod download
+
+      - name: Rodar testes com cobertura
+        run: go test -coverprofile=coverage.out ./...
+
+      # 2. FRONTEND
+      - name: Instalar dependências Frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      # 3. SNYK
+      - name: Snyk Test
+        run: |
+          export $(grep -v '^#' .env | xargs)
+          snyk auth $SNYK_TOKEN
+          snyk test --all-projects
+
+      # 4. SONAR
+      - name: SonarQube Scan
+        run: |
+          export $(grep -v '^#' .env | xargs)
+          sonar-scanner \
+            -Dsonar.projectKey=Albano15_app-padaria-desktop-golang \
+            -Dsonar.organization=albano15 \
+            -Dsonar.go.coverage.reportPaths=coverage.out \
+            -Dsonar.sources=.,frontend/src \
+            -Dsonar.exclusions=**/*_test.go,frontend/dist/**,frontend/node_modules**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
