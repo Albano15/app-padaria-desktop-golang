@@ -71,7 +71,7 @@ jobs:
             -Dsonar.projectKey=Albano15_app-padaria-desktop-golang \
             -Dsonar.organization=albano15 \
             -Dsonar.go.coverage.reportPaths=coverage.out \
-            -Dsonar.sources=.,frontend/src \
-            -Dsonar.exclusions=**/*_test.go,frontend/dist/**,frontend/node_modules**
+            -Dsonar.sources=.
+            -Dsonar.exclusions=frontend/dist/**,frontend/node_modules/**,frontend/.next/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
